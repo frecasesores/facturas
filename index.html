@@ -47,6 +47,13 @@
   .grilla { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
   .miniatura { position: relative; aspect-ratio: 3/4; border-radius: 10px; overflow: hidden; background: #ddd; }
   .miniatura img { width: 100%; height: 100%; object-fit: cover; }
+  .miniatura .pdf {
+    width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: #fff; border: 1.5px solid #cfd5dd; border-radius: 10px; padding: 6px; text-align: center;
+  }
+  .miniatura .pdf b { color: #B3261E; font-size: 18px; letter-spacing: .5px; }
+  .miniatura .pdf span { font-size: 11px; color: var(--suave); word-break: break-all; margin-top: 4px;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .miniatura button {
     position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; border-radius: 50%;
     border: 0; background: rgba(0,0,0,.6); color: #fff; font-size: 16px; line-height: 28px; padding: 0;
@@ -90,10 +97,12 @@
       Sacar foto
     </button>
     <button class="boton secundario" id="btnGaleria">Elegir de la galería</button>
-    <p class="ayuda">Una foto por comprobante, bien iluminada y que se lea completa.</p>
+    <button class="boton secundario" id="btnPdf">Subir factura en PDF</button>
+    <p class="ayuda">Una foto por comprobante, bien iluminada y que se lea completa.<br>Si te mandaron la factura en PDF, subila directamente.</p>
 
     <input type="file" id="inCamara" accept="image/*" capture="environment" class="oculto">
     <input type="file" id="inGaleria" accept="image/*" multiple class="oculto">
+    <input type="file" id="inPdf" accept="application/pdf,.pdf" multiple class="oculto">
 
     <div class="grilla" id="grilla"></div>
 
@@ -113,11 +122,12 @@
 const API_URL = 'https://script.google.com/macros/s/AKfycbwZ3zu5IeMUJKnNR5KRz9EyN50XRs3pgfhR4dFVJzmcNU8zIpv-xE6rdbscB5qayg19/exec';
 const MAX_LADO = 1800;      // píxeles del lado mayor (se lee bien y pesa ~300-500 KB)
 const CALIDAD_JPG = 0.8;
+const MAX_PDF_MB = 15;       // tamaño máximo de cada PDF
 // =================================================================================
 
 const $ = id => document.getElementById(id);
 let codigo = new URLSearchParams(location.search).get('c');
-let fotos = []; // { id, dataUrl, estado: 'pendiente'|'enviando'|'ok'|'error' }
+let fotos = []; // { id, dataUrl, tipo: 'img'|'pdf', nombre, estado: 'pendiente'|'enviando'|'ok'|'error' }
 
 // Guarda el código para que funcione aunque se abra desde el ícono sin el link
 try {
@@ -155,21 +165,42 @@ $('btnCamara').onclick = () => $('inCamara').click();
 $('btnGaleria').onclick = () => $('inGaleria').click();
 $('inCamara').onchange = e => agregar(e.target.files);
 $('inGaleria').onchange = e => agregar(e.target.files);
+$('btnPdf').onclick = () => $('inPdf').click();
+$('inPdf').onchange = e => agregar(e.target.files);
 
 async function agregar(files) {
   $('aviso').className = 'mensaje oculto';
   // si ya se envió un lote, empezar uno nuevo
   if (fotos.length && fotos.every(f => f.estado === 'ok')) fotos = [];
   for (const f of files) {
+    const esPdf = f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
     try {
-      const dataUrl = await comprimir(f);
-      fotos.push({ id: Date.now() + Math.random(), dataUrl, estado: 'pendiente' });
+      if (esPdf) {
+        if (f.size > MAX_PDF_MB * 1024 * 1024) {
+          aviso('"' + f.name + '" pesa más de ' + MAX_PDF_MB + ' MB. Pedí una versión más liviana o mandalo por mail al estudio.', 'error');
+          continue;
+        }
+        const dataUrl = await leerArchivo(f);
+        fotos.push({ id: Date.now() + Math.random(), dataUrl, tipo: 'pdf', nombre: f.name, estado: 'pendiente' });
+      } else {
+        const dataUrl = await comprimir(f);
+        fotos.push({ id: Date.now() + Math.random(), dataUrl, tipo: 'img', estado: 'pendiente' });
+      }
     } catch (e) {
-      aviso('No se pudo leer una de las imágenes.', 'error');
+      aviso('No se pudo leer "' + f.name + '".', 'error');
     }
   }
-  $('inCamara').value = ''; $('inGaleria').value = '';
+  $('inCamara').value = ''; $('inGaleria').value = ''; $('inPdf').value = '';
   dibujar();
+}
+
+function leerArchivo(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
 }
 
 function comprimir(file) {
@@ -198,10 +229,11 @@ function dibujar() {
   fotos.forEach(f => {
     const d = document.createElement('div');
     d.className = 'miniatura ' + f.estado;
-    d.innerHTML = '<img alt="">' +
+    d.innerHTML = (f.tipo === 'pdf' ? '<div class="pdf"><b>PDF</b><span></span></div>' : '<img alt="">') +
       (f.estado === 'pendiente' || f.estado === 'error' ? '<button aria-label="Quitar">×</button>' : '') +
       (textos[f.estado] ? '<div class="estado">' + textos[f.estado] + '</div>' : '');
-    d.querySelector('img').src = f.dataUrl;
+    if (f.tipo === 'pdf') d.querySelector('.pdf span').textContent = f.nombre;
+    else d.querySelector('img').src = f.dataUrl;
     const b = d.querySelector('button');
     if (b) b.onclick = () => { fotos = fotos.filter(x => x.id !== f.id); dibujar(); };
     g.appendChild(d);
@@ -210,7 +242,7 @@ function dibujar() {
   $('bloqueNota').classList.toggle('oculto', pendientes === 0);
   const btn = $('btnEnviar');
   btn.disabled = pendientes === 0;
-  btn.textContent = pendientes ? 'Enviar ' + pendientes + (pendientes === 1 ? ' foto' : ' fotos') : 'Enviar al estudio';
+  btn.textContent = pendientes ? 'Enviar ' + pendientes + (pendientes === 1 ? ' comprobante' : ' comprobantes') : 'Enviar al estudio';
 }
 
 $('btnEnviar').onclick = async () => {
@@ -226,7 +258,13 @@ $('btnEnviar').onclick = async () => {
       // Sin Content-Type explícito (text/plain) para evitar el bloqueo CORS de Apps Script
       const r = await fetch(API_URL, {
         method: 'POST',
-        body: JSON.stringify({ cod: codigo, imagen: f.dataUrl.split(',')[1], nota, n: lote.length > 1 ? n : '' })
+        body: JSON.stringify({
+          cod: codigo,
+          archivo: f.dataUrl.split(',')[1],
+          tipo: f.tipo === 'pdf' ? 'pdf' : 'jpg',
+          nota,
+          n: lote.length > 1 ? n : ''
+        })
       });
       const d = await r.json();
       f.estado = d.ok ? 'ok' : 'error';
@@ -237,7 +275,7 @@ $('btnEnviar').onclick = async () => {
     dibujar();
   }
   if (errores) {
-    aviso(errores + ' foto(s) no se pudieron enviar. Revisá la conexión y tocá Enviar de nuevo.', 'error');
+    aviso(errores + ' comprobante(s) no se pudieron enviar. Revisá la conexión y tocá Enviar de nuevo.', 'error');
   } else {
     $('nota').value = '';
     aviso('¡Listo! Recibimos tus comprobantes. Gracias.', 'ok');
