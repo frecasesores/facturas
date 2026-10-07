@@ -110,7 +110,7 @@
 
 <script>
 // ====== CONFIGURACIÓN (pegar acá la URL de la implementación de Apps Script) ======
-const API_URL = 'https://script.google.com/macros/s/AKfycbxDZWmjAHx9yLlX4hli-A8R3npkNGsy7zDaHLPX3UwNs4mBL6_4pmiLAsVwXdHVS7OKrA/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwZ3zu5IeMUJKnNR5KRz9EyN50XRs3pgfhR4dFVJzmcNU8zIpv-xE6rdbscB5qayg19/exec';
 const MAX_LADO = 1800;      // píxeles del lado mayor (se lee bien y pesa ~300-500 KB)
 const CALIDAD_JPG = 0.8;
 // =================================================================================
@@ -130,7 +130,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
 async function iniciar() {
   if (!codigo) return mostrarError('Abrí la app desde el link que te envió el estudio.');
   try {
-    const r = await fetch(API_URL + '?c=' + encodeURIComponent(codigo));
+    const r = await fetch(API_URL + '?cod=' + encodeURIComponent(codigo));
     const d = await r.json();
     if (!d.ok) return mostrarError('El link no es válido. Pedile uno nuevo al estudio.');
     $('saludo').textContent = 'Hola, ' + d.cliente;
@@ -226,7 +226,7 @@ $('btnEnviar').onclick = async () => {
       // Sin Content-Type explícito (text/plain) para evitar el bloqueo CORS de Apps Script
       const r = await fetch(API_URL, {
         method: 'POST',
-        body: JSON.stringify({ c: codigo, imagen: f.dataUrl.split(',')[1], nota, n: lote.length > 1 ? n : '' })
+        body: JSON.stringify({ cod: codigo, imagen: f.dataUrl.split(',')[1], nota, n: lote.length > 1 ? n : '' })
       });
       const d = await r.json();
       f.estado = d.ok ? 'ok' : 'error';
