@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FR Facturas</title>
+<meta name="theme-color" content="#004066">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="FR Facturas">
+<style>
+  /* ====== COLORES DEL ESTUDIO (cambiar acá) ====== */
+  :root {
+    --primario: #004066;
+    --acento: #0A5C8C;
+    --fondo: #F4F6F9;
+    --texto: #1D2430;
+    --suave: #6B7685;
+    --ok: #2E7D4F;
+    --error: #B3261E;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--fondo); color: var(--texto);
+    min-height: 100vh; display: flex; flex-direction: column;
+  }
+  header {
+    background: var(--primario); color: #fff; text-align: center;
+    padding: calc(20px + env(safe-area-inset-top)) 16px 20px;
+  }
+  header img { max-height: 56px; max-width: 70%; display: block; margin: 0 auto 8px; }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  header p { margin: 4px 0 0; font-size: 14px; opacity: .85; }
+  main { flex: 1; padding: 20px 16px 120px; max-width: 520px; width: 100%; margin: 0 auto; }
+  .boton {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    width: 100%; border: 0; border-radius: 14px; padding: 18px;
+    font-size: 18px; font-weight: 600; cursor: pointer;
+  }
+  .boton.camara { background: var(--acento); color: #fff; min-height: 120px; flex-direction: column; }
+  .boton.camara svg { width: 40px; height: 40px; }
+  .boton.secundario { background: #fff; color: var(--primario); border: 1.5px solid var(--primario); margin-top: 10px; font-size: 15px; padding: 12px; }
+  .ayuda { color: var(--suave); font-size: 14px; text-align: center; margin: 12px 0 20px; }
+  .grilla { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+  .miniatura { position: relative; aspect-ratio: 3/4; border-radius: 10px; overflow: hidden; background: #ddd; }
+  .miniatura img { width: 100%; height: 100%; object-fit: cover; }
+  .miniatura button {
+    position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; border-radius: 50%;
+    border: 0; background: rgba(0,0,0,.6); color: #fff; font-size: 16px; line-height: 28px; padding: 0;
+  }
+  .miniatura .estado {
+    position: absolute; inset: auto 0 0 0; padding: 4px; font-size: 12px; text-align: center;
+    background: rgba(0,0,0,.6); color: #fff;
+  }
+  .miniatura.ok .estado { background: var(--ok); }
+  .miniatura.error .estado { background: var(--error); }
+  textarea {
+    width: 100%; border: 1px solid #cfd5dd; border-radius: 10px; padding: 10px;
+    font: inherit; font-size: 15px; resize: vertical; min-height: 60px;
+  }
+  label { font-size: 14px; color: var(--suave); display: block; margin-bottom: 6px; }
+  footer {
+    position: fixed; left: 0; right: 0; bottom: 0; background: #fff;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); box-shadow: 0 -2px 10px rgba(0,0,0,.08);
+  }
+  footer .boton { background: var(--primario); color: #fff; max-width: 520px; margin: 0 auto; }
+  footer .boton:disabled { opacity: .4; }
+  .mensaje { border-radius: 12px; padding: 16px; text-align: center; margin-bottom: 16px; }
+  .mensaje.ok { background: #E3F2E8; color: var(--ok); }
+  .mensaje.error { background: #FBE4E2; color: var(--error); }
+  .oculto { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <img src="logo.png" alt="Fernandez Robles &amp; Asociados" onerror="this.style.display='none'">
+  <h1>Facturas y tickets de compra</h1>
+  <p id="saludo">Cargando…</p>
+</header>
+
+<main>
+  <div id="aviso" class="mensaje oculto"></div>
+
+  <section id="app" class="oculto">
+    <button class="boton camara" id="btnCamara">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      Sacar foto
+    </button>
+    <button class="boton secundario" id="btnGaleria">Elegir de la galería</button>
+    <p class="ayuda">Una foto por comprobante, bien iluminada y que se lea completa.</p>
+
+    <input type="file" id="inCamara" accept="image/*" capture="environment" class="oculto">
+    <input type="file" id="inGaleria" accept="image/*" multiple class="oculto">
+
+    <div class="grilla" id="grilla"></div>
+
+    <div id="bloqueNota" class="oculto">
+      <label for="nota">Comentario (opcional)</label>
+      <textarea id="nota" placeholder="Ej: combustible camioneta, compra de mercadería…"></textarea>
+    </div>
+  </section>
+</main>
+
+<footer id="pie" class="oculto">
+  <button class="boton" id="btnEnviar" disabled>Enviar al estudio</button>
+</footer>
+
+<script>
+// ====== CONFIGURACIÓN (pegar acá la URL de la implementación de Apps Script) ======
+const API_URL = 'https://script.google.com/macros/s/AKfycbxDZWmjAHx9yLlX4hli-A8R3npkNGsy7zDaHLPX3UwNs4mBL6_4pmiLAsVwXdHVS7OKrA/exec';
+const MAX_LADO = 1800;      // píxeles del lado mayor (se lee bien y pesa ~300-500 KB)
+const CALIDAD_JPG = 0.8;
+// =================================================================================
+
+const $ = id => document.getElementById(id);
+let codigo = new URLSearchParams(location.search).get('c');
+let fotos = []; // { id, dataUrl, estado: 'pendiente'|'enviando'|'ok'|'error' }
+
+// Guarda el código para que funcione aunque se abra desde el ícono sin el link
+try {
+  if (codigo) localStorage.setItem('codigoCliente', codigo);
+  else codigo = localStorage.getItem('codigoCliente');
+} catch (e) {}
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+
+async function iniciar() {
+  if (!codigo) return mostrarError('Abrí la app desde el link que te envió el estudio.');
+  try {
+    const r = await fetch(API_URL + '?c=' + encodeURIComponent(codigo));
+    const d = await r.json();
+    if (!d.ok) return mostrarError('El link no es válido. Pedile uno nuevo al estudio.');
+    $('saludo').textContent = 'Hola, ' + d.cliente;
+    $('app').classList.remove('oculto');
+    $('pie').classList.remove('oculto');
+  } catch (e) {
+    mostrarError('No hay conexión. Revisá internet y volvé a abrir la app.');
+  }
+}
+
+function mostrarError(txt) {
+  $('saludo').textContent = '';
+  aviso(txt, 'error');
+}
+function aviso(txt, tipo) {
+  const a = $('aviso');
+  a.textContent = txt;
+  a.className = 'mensaje ' + tipo;
+}
+
+$('btnCamara').onclick = () => $('inCamara').click();
+$('btnGaleria').onclick = () => $('inGaleria').click();
+$('inCamara').onchange = e => agregar(e.target.files);
+$('inGaleria').onchange = e => agregar(e.target.files);
+
+async function agregar(files) {
+  $('aviso').className = 'mensaje oculto';
+  // si ya se envió un lote, empezar uno nuevo
+  if (fotos.length && fotos.every(f => f.estado === 'ok')) fotos = [];
+  for (const f of files) {
+    try {
+      const dataUrl = await comprimir(f);
+      fotos.push({ id: Date.now() + Math.random(), dataUrl, estado: 'pendiente' });
+    } catch (e) {
+      aviso('No se pudo leer una de las imágenes.', 'error');
+    }
+  }
+  $('inCamara').value = ''; $('inGaleria').value = '';
+  dibujar();
+}
+
+function comprimir(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      let { width: w, height: h } = img;
+      const esc = Math.min(1, MAX_LADO / Math.max(w, h));
+      w = Math.round(w * esc); h = Math.round(h * esc);
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', CALIDAD_JPG));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+function dibujar() {
+  const g = $('grilla');
+  g.innerHTML = '';
+  const textos = { pendiente: '', enviando: 'Enviando…', ok: 'Enviada ✓', error: 'Error' };
+  fotos.forEach(f => {
+    const d = document.createElement('div');
+    d.className = 'miniatura ' + f.estado;
+    d.innerHTML = '<img alt="">' +
+      (f.estado === 'pendiente' || f.estado === 'error' ? '<button aria-label="Quitar">×</button>' : '') +
+      (textos[f.estado] ? '<div class="estado">' + textos[f.estado] + '</div>' : '');
+    d.querySelector('img').src = f.dataUrl;
+    const b = d.querySelector('button');
+    if (b) b.onclick = () => { fotos = fotos.filter(x => x.id !== f.id); dibujar(); };
+    g.appendChild(d);
+  });
+  const pendientes = fotos.filter(f => f.estado === 'pendiente' || f.estado === 'error').length;
+  $('bloqueNota').classList.toggle('oculto', pendientes === 0);
+  const btn = $('btnEnviar');
+  btn.disabled = pendientes === 0;
+  btn.textContent = pendientes ? 'Enviar ' + pendientes + (pendientes === 1 ? ' foto' : ' fotos') : 'Enviar al estudio';
+}
+
+$('btnEnviar').onclick = async () => {
+  const btn = $('btnEnviar');
+  btn.disabled = true;
+  const nota = $('nota').value.trim();
+  const lote = fotos.filter(f => f.estado === 'pendiente' || f.estado === 'error');
+  let errores = 0, n = 0;
+  for (const f of lote) {
+    n++;
+    f.estado = 'enviando'; dibujar(); btn.disabled = true;
+    try {
+      // Sin Content-Type explícito (text/plain) para evitar el bloqueo CORS de Apps Script
+      const r = await fetch(API_URL, {
+        method: 'POST',
+        body: JSON.stringify({ c: codigo, imagen: f.dataUrl.split(',')[1], nota, n: lote.length > 1 ? n : '' })
+      });
+      const d = await r.json();
+      f.estado = d.ok ? 'ok' : 'error';
+      if (!d.ok) errores++;
+    } catch (e) {
+      f.estado = 'error'; errores++;
+    }
+    dibujar();
+  }
+  if (errores) {
+    aviso(errores + ' foto(s) no se pudieron enviar. Revisá la conexión y tocá Enviar de nuevo.', 'error');
+  } else {
+    $('nota').value = '';
+    aviso('¡Listo! Recibimos tus comprobantes. Gracias.', 'ok');
+  }
+};
+
+iniciar();
+</script>
+</body>
+</html>
