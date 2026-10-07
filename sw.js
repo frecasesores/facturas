@@ -1,6 +1,6 @@
 // Service worker mínimo: permite instalar la app y guarda en caché la pantalla.
 // Las fotos nunca se guardan acá; se envían directo al estudio.
-const CACHE = 'fr-facturas-v3';
+const CACHE = 'fr-facturas-v4';
 const ARCHIVOS = ['./', 'index.html', 'manifest.json', 'logo.png', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 
 self.addEventListener('install', e => {

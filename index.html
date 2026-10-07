@@ -91,6 +91,14 @@
 <main>
   <div id="aviso" class="mensaje oculto"></div>
 
+  <section id="ingreso" class="oculto">
+    <label for="inCuit">Ingresá tu CUIT (sin guiones)</label>
+    <input id="inCuit" type="tel" inputmode="numeric" autocomplete="off" placeholder="Ej: 20123456789"
+      style="width:100%;border:1px solid #cfd5dd;border-radius:10px;padding:14px;font-size:18px;margin-bottom:12px;">
+    <button class="boton camara" id="btnIngresar" style="min-height:auto;">Ingresar</button>
+    <p class="ayuda">Solo la primera vez. Después la app te recuerda.</p>
+  </section>
+
   <section id="app" class="oculto">
     <button class="boton camara" id="btnCamara">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
@@ -137,17 +145,40 @@ try {
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
+function pedirCuit(msg) {
+  $('saludo').textContent = 'Bienvenido';
+  $('ingreso').classList.remove('oculto');
+  if (msg) aviso(msg, 'error'); else $('aviso').className = 'mensaje oculto';
+}
+
+$('btnIngresar').onclick = () => {
+  const v = $('inCuit').value.replace(/\D/g, '');
+  if (v.length !== 11) return aviso('El CUIT tiene que tener 11 números.', 'error');
+  codigo = v;
+  $('aviso').className = 'mensaje oculto';
+  iniciar();
+};
+
 async function iniciar() {
-  if (!codigo) return mostrarError('Abrí la app desde el link que te envió el estudio.');
+  if (!codigo) return pedirCuit();
+  $('btnIngresar').disabled = true;
   try {
     const r = await fetch(API_URL + '?cod=' + encodeURIComponent(codigo));
     const d = await r.json();
-    if (!d.ok) return mostrarError('El link no es válido. Pedile uno nuevo al estudio.');
+    if (!d.ok) {
+      try { localStorage.removeItem('codigoCliente'); } catch (e) {}
+      codigo = null;
+      return pedirCuit('No encontramos ese CUIT. Revisalo o consultá al estudio.');
+    }
+    try { localStorage.setItem('codigoCliente', codigo); } catch (e) {}
+    $('ingreso').classList.add('oculto');
     $('saludo').textContent = 'Hola, ' + d.cliente;
     $('app').classList.remove('oculto');
     $('pie').classList.remove('oculto');
   } catch (e) {
     mostrarError('No hay conexión. Revisá internet y volvé a abrir la app.');
+  } finally {
+    $('btnIngresar').disabled = false;
   }
 }
 
